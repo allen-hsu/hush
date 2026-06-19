@@ -13,6 +13,8 @@ worktree 裡——repo 只保留一份「不含值」的宣告，真正的值 ag
 hush run -- npm run dev          # 解密、把 env 只注入這個子行程、然後 exec
 ```
 
+![hush demo](docs/demo.gif)
+
 - 🔍 在 worktree 裡 `cat .env` / `grep -r KEY` **只找得到 key 名稱，永遠看不到值**。
 - 🔐 Secret 以 age 加密存在 repo 外的單一檔案；主金鑰放在 **macOS Keychain**——磁碟上沒有任何明文金鑰檔。
 - 🧬 值只注入 `hush run` 的子行程，**絕不**進你的 shell。

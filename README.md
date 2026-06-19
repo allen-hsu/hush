@@ -14,6 +14,8 @@ injected only into the child process of the command that needs them.
 hush run -- npm run dev          # decrypts, injects env into THIS child only, execs
 ```
 
+![hush demo](docs/demo.gif)
+
 - 🔍 `cat .env` / `grep -r KEY` in a worktree finds **key names only, never values**.
 - 🔐 Secrets are age-encrypted in one file outside the repo; the master key lives in the
   **macOS Keychain** — there is no plaintext key file on disk.
