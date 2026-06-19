@@ -24,6 +24,11 @@ type Config struct {
 	Keys    []string `toml:"keys"`              // declared contract
 	Shims   []string `toml:"shims,omitempty"`   // commands to auto-wrap (opt-in)
 
+	// DisableGet, when true, makes `hush get` always refuse (even on a TTY), so
+	// values can never be printed to a terminal — `hush run` becomes the only way
+	// to use them. For projects with especially sensitive secrets.
+	DisableGet bool `toml:"disable_get,omitempty"`
+
 	dir string // directory containing the file
 }
 

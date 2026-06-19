@@ -113,7 +113,7 @@ once; you only `set` the diffs.
 | `hush set <KEY>` | Set one value — interactive prompt or piped stdin. |
 | `hush unset <KEY>` | Remove a key from the active profile. |
 | `hush ls` | List declared keys + which profile resolves each. Never prints values. |
-| `hush get <KEY>` | Print a value (TTY only; refused for agents). |
+| `hush get [KEY]` | Print a value (TTY only; refused for agents). Omit `KEY` to pick from a numbered list; set `disable_get = true` to forbid it entirely. |
 | `hush import [path]` | Import an existing `.env`. Flags: `--profile`, `--force`, `--shred`. |
 | `hush fork [--from p]` | Copy a profile into the active profile. |
 | `hush cp <from> <to>` | Copy one profile's values into another. |
@@ -136,10 +136,12 @@ machine-readable output — useful for scripts and agents.
   the bare command auto-wraps it — `npm run dev` runs as `hush run -- npm run dev`.
   Values land in that child only; your persistent shell stays clean.
 
-Leaving the project tears the shims down. With `CLAUDECODE` / `HUSH_AGENT` set (or no
-TTY), **nothing installs** — an agent must call `hush run` explicitly and never inherits
-shims or shell env. The `cd` feed (`hush context`) reads only `.hush.toml` (+ git), never
-the store, so it never triggers a Keychain prompt.
+Leaving the project tears the shims down. When an agent is detected — `CLAUDECODE`
+(Claude Code), `CODEX_SANDBOX` (Codex), or `HUSH_AGENT` set, or no TTY — **nothing
+installs** and `hush get` is refused; the agent must call `hush run` explicitly and never
+inherits shims or shell env. `HUSH_AGENT=1` is the universal override for any other
+runtime. The `cd` feed (`hush context`) reads only `.hush.toml` (+ git), never the store,
+so it never triggers a Keychain prompt.
 
 ```toml
 # .hush.toml — committed, value-free
@@ -147,6 +149,7 @@ profile = "branch"          # branch | cwd | fixed:<name>
 extends = "base"            # fall back to this profile for keys absent in the active one
 keys    = ["DATABASE_URL", "DEPLOYER_KEY"]
 shims   = ["npm", "pnpm"]   # opt-in; commands to auto-wrap with `hush run`
+# disable_get = true        # forbid `hush get` entirely — values usable only via `hush run`
 ```
 
 ---

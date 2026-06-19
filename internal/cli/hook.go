@@ -18,7 +18,7 @@ package cli
 // themselves don't recurse: `hush run` execs the real binary via PATH (execve
 // ignores shell functions), so `forge()` -> `hush run -- forge` -> real forge.
 const shellHook = `# hush shell integration — add to ~/.zshrc:  eval "$(hush hook)"
-if [ -z "$CLAUDECODE" ] && [ -z "$HUSH_AGENT" ] && [[ $- == *i* ]]; then
+if [ -z "$CLAUDECODE" ] && [ -z "$CODEX_SANDBOX" ] && [ -z "$HUSH_AGENT" ] && [[ $- == *i* ]]; then
   typeset -ga _HUSH_SHIMS
   typeset -g _HUSH_LAST
 

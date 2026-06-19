@@ -104,8 +104,8 @@ func cmdLs(args []string) error {
 // cmdGet prints a single value — TTY only; refused for agents.
 func cmdGet(args []string) error {
 	asJSON, args := popJSON(args)
-	if len(args) != 1 {
-		return usageErr("get: exactly one KEY required")
+	if len(args) > 1 {
+		return usageErr("get: at most one KEY (omit it to pick from a list)")
 	}
 	if isAgent() {
 		return refusedErr("get is refused in agent/non-interactive mode (use `hush run`)")
@@ -114,16 +114,50 @@ func cmdGet(args []string) error {
 	if err != nil {
 		return err
 	}
+	if cfg.DisableGet {
+		return refusedErr("get is disabled for this project (disable_get in .hush.toml) — use `hush run`")
+	}
 	vals, _ := resolve.Values(cfg, ctx, data)
-	v, ok := vals[args[0]]
+
+	key := ""
+	if len(args) == 1 {
+		key = args[0]
+	} else {
+		// No key given — let the human pick from the declared keys.
+		key, err = pickKey(cfg.Keys)
+		if err != nil {
+			return err
+		}
+	}
+	v, ok := vals[key]
 	if !ok {
-		return coded{exitDecrypt, "no value for " + args[0]}
+		return coded{exitDecrypt, "no value for " + key}
 	}
 	if asJSON {
-		return emitJSON(map[string]any{"key": args[0], "value": v})
+		return emitJSON(map[string]any{"key": key, "value": v})
 	}
 	fmt.Println(v)
 	return nil
+}
+
+// pickKey prints a numbered list of keys to stderr and reads a 1-based choice
+// from stdin. Used by `hush get` with no key. TTY-gated by the caller.
+func pickKey(keys []string) (string, error) {
+	if len(keys) == 0 {
+		return "", coded{exitUsage, "no keys declared in .hush.toml"}
+	}
+	for i, k := range keys {
+		fmt.Fprintf(os.Stderr, "  %2d) %s\n", i+1, k)
+	}
+	fmt.Fprintf(os.Stderr, "pick a key [1-%d]: ", len(keys))
+	var n int
+	if _, err := fmt.Fscan(os.Stdin, &n); err != nil {
+		return "", coded{exitUsage, "invalid selection"}
+	}
+	if n < 1 || n > len(keys) {
+		return "", coded{exitUsage, "selection out of range"}
+	}
+	return keys[n-1], nil
 }
 
 // cmdSet writes one value: interactive prompt or piped stdin. No CLI value form.
@@ -456,7 +490,8 @@ profile = "branch"         # branch | cwd | fixed:<name> — how to pick a profi
 extends = "base"           # fall back to this profile for keys absent in the active one
 
 keys = []                  # declared keys (hush appends here on set/import; safe to edit)
-# shims = ["forge", "cast"]  # commands to auto-wrap with ` + "`hush run`" + ` (needs: eval "$(hush hook)")
+# shims = ["npm", "pnpm"]    # commands to auto-wrap with ` + "`hush run`" + ` (needs: eval "$(hush hook)")
+# disable_get = true         # forbid ` + "`hush get`" + ` entirely — values usable only via ` + "`hush run`" + `
 `
 
 // cmdHook prints the shell integration snippet (shims + chpwd profile banner).

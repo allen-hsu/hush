@@ -105,7 +105,7 @@ commit 進去的 `.hush.toml` 會跟著 checkout 走，所以新 worktree 馬上
 | `hush set <KEY>` | 設定單一值——互動輸入或 piped stdin。 |
 | `hush unset <KEY>` | 從當前 profile 移除一個 key。 |
 | `hush ls` | 列出宣告的 key + 由哪個 profile 解析。永不顯示值。 |
-| `hush get <KEY>` | 印出某個值（限 TTY；對 agent 拒絕）。 |
+| `hush get [KEY]` | 印出某個值（限 TTY；對 agent 拒絕）。省略 `KEY` 會列出編號清單讓你選；設 `disable_get = true` 可完全禁用。 |
 | `hush import [path]` | 匯入現有 `.env`。旗標：`--profile`、`--force`、`--shred`。 |
 | `hush fork [--from p]` | 把某個 profile 複製到當前 profile。 |
 | `hush cp <from> <to>` | 把一個 profile 的值複製到另一個。 |
@@ -126,9 +126,10 @@ commit 進去的 `.hush.toml` 會跟著 checkout 走，所以新 worktree 馬上
 - **shim**：對 `.hush.toml` `shims = [...]` 裡的每個命令（你自己挑），打裸命令會自動包起來——
   `npm run dev` 實際以 `hush run -- npm run dev` 執行。值只進那個子行程，你的 shell 保持乾淨。
 
-離開專案時 shim 會被拆掉。當 `CLAUDECODE` / `HUSH_AGENT` 有設（或沒有 TTY）時，**什麼都不裝**——
-agent 必須顯式呼叫 `hush run`，永遠不會繼承到 shim 或 shell env。`cd` 的資料來源（`hush context`）
-只讀 `.hush.toml`（+ git），不碰 store，所以**永遠不會觸發 Keychain 提示**。
+離開專案時 shim 會被拆掉。一旦偵測到 agent —— `CLAUDECODE`（Claude Code）、`CODEX_SANDBOX`（Codex）
+或 `HUSH_AGENT` 有設，或沒有 TTY ——**什麼都不裝**,且 `hush get` 被拒絕;agent 必須顯式呼叫
+`hush run`,永遠不會繼承到 shim 或 shell env。其他 runtime 可用 `HUSH_AGENT=1` 當通用開關。`cd`
+的資料來源（`hush context`）只讀 `.hush.toml`（+ git），不碰 store，所以**永遠不會觸發 Keychain 提示**。
 
 ```toml
 # .hush.toml — 會 commit、不含值
@@ -136,6 +137,7 @@ profile = "branch"          # branch | cwd | fixed:<name>
 extends = "base"            # 當前 profile 沒有的 key，往這個 profile 找
 keys    = ["DATABASE_URL", "DEPLOYER_KEY"]
 shims   = ["npm", "pnpm"]   # opt-in；要自動包 hush run 的命令
+# disable_get = true        # 完全禁用 hush get —— 值只能透過 hush run 使用
 ```
 
 ---

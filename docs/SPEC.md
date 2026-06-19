@@ -82,7 +82,7 @@ shims = ["npm", "pnpm"]      # commands to auto-wrap with `hush run` (opt-in; em
 | `hush set <KEY>` | Set one value: interactive prompt (not echoed, not in history) or piped stdin. No command-line value form (would leak via history/`ps`). |
 | `hush unset <KEY>` | Remove a key from the active profile. |
 | `hush ls [--json]` | List declared keys + which profile resolves each. **Never prints values.** |
-| `hush get <KEY> [--json]` | Print a value — **only on a TTY**; non-TTY (agent) → refuse with exit 3. |
+| `hush get [KEY] [--json]` | Print a value — **TTY only**; omit `KEY` to pick from a numbered list; non-TTY/agent → refuse (exit 3); always refused when `disable_get = true`. |
 | `hush import [path] [--profile p] [--force] [--shred]` | Import an existing `.env` into a profile and record the keys. One-command migration. |
 | `hush fork [--from base]` | Copy a profile into the active one, so you only `set` the diffs. Sugar for `cp`. |
 | `hush cp <from> <to> [--force]` | Copy one profile's values into another. |
@@ -190,9 +190,19 @@ Mode is auto-detected, not configured:
 
 ```
 agent / non-interactive  →  STRICT: no shims; only `hush run` works; `hush get` refused.
-                            Detected by: CLAUDECODE/HUSH_AGENT set, or no TTY.
+                            Detected by an env marker or no TTY (see below).
 interactive human shell  →  SMOOTH: shell shims + chpwd banner active.
 ```
+
+**Agent detection** is a small list of env markers set by known runtimes —
+`CLAUDECODE` (Claude Code), `CODEX_SANDBOX` (Codex), `HUSH_AGENT` (universal manual
+override) — plus a no-TTY fallback that catches agents which run commands
+non-interactively without setting any marker. Adding a new runtime is one line in that
+list; users can always force strict mode with `HUSH_AGENT=1`.
+
+`disable_get = true` in `.hush.toml` is the stricter opt-in: `hush get` is then refused
+even for a human on a TTY, so values can only ever be *used* (via `hush run`), never
+printed.
 
 **Smoothness (human only),** via `eval "$(hush hook)"`:
 - **Command shims**: commands listed in `.hush.toml` `shims` (per-project opt-in, empty by

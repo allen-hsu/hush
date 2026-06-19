@@ -32,7 +32,7 @@ usage:
   hush set <KEY>                set one value (interactive prompt or piped stdin)
   hush unset <KEY>              remove a key from the active profile
   hush ls [--json]              list declared keys + resolving profile (no values)
-  hush get <KEY>                print a value (TTY only; refused for agents)
+  hush get [KEY]                print a value (TTY only; omit KEY to pick from a list)
   hush import [path] [flags]    import an existing .env into a profile
   hush fork [--from p]          copy a profile into the active profile
   hush cp <from> <to>           copy one profile's values into another
@@ -142,13 +142,32 @@ func emitJSON(obj any) error {
 	return enc.Encode(obj)
 }
 
-// isAgent reports whether we're running for an agent / non-interactive context,
-// in which case secret-revealing commands (get, edit) are refused.
-func isAgent() bool {
-	if os.Getenv("CLAUDECODE") != "" || os.Getenv("HUSH_AGENT") != "" {
-		return true
+// agentEnvMarkers are env vars set by known agent runtimes inside the commands
+// they spawn. Any non-empty value forces strict "use, don't see" mode. The
+// no-TTY check in isAgent already catches most agents (they run commands
+// non-interactively); these markers also cover agents that allocate a PTY.
+// HUSH_AGENT is the universal manual override for any runtime not listed here.
+var agentEnvMarkers = []string{
+	"HUSH_AGENT",    // universal manual override
+	"CLAUDECODE",    // Claude Code
+	"CODEX_SANDBOX", // OpenAI Codex CLI (set for sandboxed tool commands)
+}
+
+// hasAgentMarker reports whether any known agent-runtime env marker is set.
+func hasAgentMarker() bool {
+	for _, k := range agentEnvMarkers {
+		if os.Getenv(k) != "" {
+			return true
+		}
 	}
-	return !term.IsTerminal(int(os.Stdin.Fd()))
+	return false
+}
+
+// isAgent reports whether we're running for an agent / non-interactive context,
+// in which case secret-revealing commands (get, edit) are refused. True if a
+// known marker is set, or stdin isn't a TTY (covers agents that don't set one).
+func isAgent() bool {
+	return hasAgentMarker() || !term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 // load resolves config + store + addressing context for the cwd.
