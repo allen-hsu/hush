@@ -1,5 +1,7 @@
 # hush
 
+**English** · [繁體中文](README.zh-TW.md)
+
 > Local, **agent-safe** secrets for per-worktree development. Zero service, zero daemon.
 
 `.env` files are a liability the moment an AI coding agent is in your repo: agents love to
