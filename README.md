@@ -11,7 +11,7 @@ only a value-free declaration; the actual values live age-encrypted outside it, 
 injected only into the child process of the command that needs them.
 
 ```sh
-hush run -- forge script ...     # decrypts, injects env into THIS child only, execs
+hush run -- npm run dev          # decrypts, injects env into THIS child only, execs
 ```
 
 - 🔍 `cat .env` / `grep -r KEY` in a worktree finds **key names only, never values**.
@@ -63,7 +63,7 @@ cd my-project
 hush init                    # writes .hush.toml (committed; declares keys, no values)
 hush import .env --shred     # migrate an existing .env, then destroy the plaintext
 hush ls                      # key names + which profile resolves each (no values)
-hush run -- forge script ... # decrypt, inject env into this child only, exec
+hush run -- npm run dev      # decrypt, inject env into this child only, exec
 ```
 
 That's the whole loop: declare → import → run. Your code reads `process.env` /
@@ -131,8 +131,8 @@ machine-readable output — useful for scripts and agents.
 
 - a dim banner showing the active `project · profile` when you `cd` into a project;
 - **shims**: for each command in `.hush.toml` `shims = [...]` (you choose them), typing
-  the bare command auto-wraps it — `forge ...` runs as `hush run -- forge ...`. Values
-  land in that child only; your persistent shell stays clean.
+  the bare command auto-wraps it — `npm run dev` runs as `hush run -- npm run dev`.
+  Values land in that child only; your persistent shell stays clean.
 
 Leaving the project tears the shims down. With `CLAUDECODE` / `HUSH_AGENT` set (or no
 TTY), **nothing installs** — an agent must call `hush run` explicitly and never inherits
@@ -144,7 +144,7 @@ the store, so it never triggers a Keychain prompt.
 profile = "branch"          # branch | cwd | fixed:<name>
 extends = "base"            # fall back to this profile for keys absent in the active one
 keys    = ["DATABASE_URL", "DEPLOYER_KEY"]
-shims   = ["forge", "cast"] # opt-in; commands to auto-wrap with `hush run`
+shims   = ["npm", "pnpm"]   # opt-in; commands to auto-wrap with `hush run`
 ```
 
 ---
