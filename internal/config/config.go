@@ -29,6 +29,22 @@ type Config struct {
 	// to use them. For projects with especially sensitive secrets.
 	DisableGet bool `toml:"disable_get,omitempty"`
 
+	// DenyAgentRun, when true, makes `hush run` refuse whenever a known agent
+	// marker is set (CLAUDECODE/CODEX_SANDBOX/HUSH_AGENT) — so an honest agent
+	// can't pull values at all (not even via `hush run -- sh -c 'echo $X'`); a
+	// human must run secret-dependent commands. Detection is marker-based and
+	// best-effort: a process sharing your uid can unset the marker to evade, so
+	// this guards against careless/honest agents, not a determined attacker.
+	DenyAgentRun bool `toml:"deny_agent_run,omitempty"`
+
+	// AgentProfile, when set, makes detected agents resolve against this profile
+	// instead of the normal one — point it at a profile holding sandbox/test
+	// credentials so an agent can still run the program, but only ever sees
+	// throwaway values. The `extends` fallback is disabled for this case so a
+	// missing key can't leak a real value from `base`. Alternative to
+	// DenyAgentRun (which forbids running outright).
+	AgentProfile string `toml:"agent_profile,omitempty"`
+
 	dir string // directory containing the file
 }
 

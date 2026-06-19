@@ -150,6 +150,7 @@ extends = "base"            # fall back to this profile for keys absent in the a
 keys    = ["DATABASE_URL", "DEPLOYER_KEY"]
 shims   = ["npm", "pnpm"]   # opt-in; commands to auto-wrap with `hush run`
 # disable_get = true        # forbid `hush get` entirely — values usable only via `hush run`
+# deny_agent_run = true     # also refuse `hush run` for detected agents — humans only
 ```
 
 ---
@@ -169,6 +170,26 @@ Any local tool that can decrypt can be invoked by anything sharing your uid; clo
 needs a separate trust domain (daemon / per-binary Keychain ACL), which is intentionally
 out of scope for a local single-user tool. The goal is to defeat accidental exposure and
 an agent's reflex to read files — not a determined local attacker.
+
+**Per-project agent policy** (in `.hush.toml`):
+
+- `disable_get = true` — forbid `hush get` even for a human (values usable only via `run`).
+- `deny_agent_run = true` — refuse `hush run` when an agent marker is set, so an honest
+  agent can't pull values at all; a human runs secret-dependent commands.
+- `agent_profile = "sandbox"` — detected agents resolve against a sandbox profile instead,
+  so the agent **can still run the program** but only ever sees throwaway test
+  credentials. Often the most practical answer: stop hiding secrets from the agent, give
+  it ones that don't matter. (`extends` is disabled in this case so a missing key can't
+  leak a real value from `base`.)
+
+These are **guardrails against honest/careless agents, not walls.** Detection is
+marker-based, and a process sharing your uid can `unset` the marker — or copy a wrapper
+script's `unset` — to evade. You cannot, on the same uid, let an agent *run* a
+secret-bearing process yet stop it from reading that process's own env/memory. A real
+boundary needs the privileged run to happen somewhere the agent can't control: a separate
+user, a daemon/broker that returns only results, or running the app as a service the agent
+merely talks to over localhost. Plain `.env` is strictly weaker than any of this — the
+agent just reads the file.
 
 ---
 

@@ -31,6 +31,9 @@ func cmdRun(args []string) error {
 	if err != nil {
 		return err
 	}
+	if cfg.DenyAgentRun && hasAgentMarker() {
+		return refusedErr("hush run is disabled for agents on this project (deny_agent_run) — ask a human to run secret-dependent commands")
+	}
 	vals, missing := resolve.Values(cfg, ctx, data)
 	if len(missing) > 0 {
 		return coded{exitDecrypt, fmt.Sprintf(
@@ -492,6 +495,8 @@ extends = "base"           # fall back to this profile for keys absent in the ac
 keys = []                  # declared keys (hush appends here on set/import; safe to edit)
 # shims = ["npm", "pnpm"]    # commands to auto-wrap with ` + "`hush run`" + ` (needs: eval "$(hush hook)")
 # disable_get = true         # forbid ` + "`hush get`" + ` entirely — values usable only via ` + "`hush run`" + `
+# deny_agent_run = true      # also refuse ` + "`hush run`" + ` for detected agents — humans only
+# agent_profile = "sandbox"  # detected agents resolve here instead — give it test creds
 `
 
 // cmdHook prints the shell integration snippet (shims + chpwd profile banner).

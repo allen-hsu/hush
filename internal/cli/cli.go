@@ -195,5 +195,13 @@ func load() (*config.Config, *store.Store, resolve.Context, store.Data, error) {
 	if ctx.Warning != "" {
 		fmt.Fprintln(os.Stderr, "hush: "+ctx.Warning)
 	}
+	// When an agent is detected and the project pins an agent_profile, resolve
+	// against it (sandbox/test creds) instead. Disable the extends fallback so a
+	// key absent from the sandbox profile can't leak a real value from base.
+	if cfg.AgentProfile != "" && hasAgentMarker() {
+		ctx.Profile = cfg.AgentProfile
+		cfg.Extends = ""
+		fmt.Fprintf(os.Stderr, "hush: agent detected → using sandbox profile %q\n", ctx.Profile)
+	}
 	return cfg, st, ctx, data, nil
 }

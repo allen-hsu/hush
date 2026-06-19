@@ -247,6 +247,22 @@ separate trust domain (daemon / per-binary Keychain ACL), which is out of scope.
 is to defeat accidental exposure and an agent's reflex to read files — not a determined
 local attacker.
 
+**Per-project agent policy** (`.hush.toml`):
+- `disable_get = true` — `hush get` refused even for a human.
+- `deny_agent_run = true` — `hush run` refused when an agent marker is set.
+- `agent_profile = "sandbox"` — agents resolve against a sandbox profile (test creds), so
+  they can still run the program but only see throwaway values. `extends` is disabled in
+  this case so a missing key can't leak a real value from `base`.
+
+These are **guardrails against honest/careless agents, not walls.** Detection is
+marker-based; a process on the same uid can `unset` the marker — or copy a wrapper
+script's `unset` — to evade. The deeper invariant: on one uid you cannot let an agent
+*run* a secret-bearing process and also stop it reading that process's own env/memory
+(`agent_profile` sidesteps this by making the value worthless rather than hidden). A true
+boundary requires the privileged run to live where the agent can't control it — a separate
+user, a result-only broker, or the app running as a service the agent only reaches over
+localhost. (Plain `.env` is strictly weaker — the agent just reads the file.)
+
 **Exit codes:** `0` ok · `2` config/usage · `3` refused (e.g. `get` without a TTY) ·
 `4` decrypt/Keychain/runtime failure.
 
