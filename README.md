@@ -179,7 +179,9 @@ un-notarized binary downloaded from a release will be quarantined by macOS Gatek
 
 ## Status
 
-MVP, working and tested:
+**v0.1 — released.** `go install github.com/allen-hsu/hush@latest`.
+
+Full command set is in place and tested:
 `run · edit · set · unset · ls · get · import · fork · cp · init · install · hook · context · scrub`.
 Tests cover the store crypto (round-trip, encryption-at-rest, wrong-key rejection),
 profile/extends resolution, dotenv parsing, and the RAM-disk temp path.
