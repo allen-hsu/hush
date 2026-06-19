@@ -40,23 +40,25 @@ changelog:
       - "^test:"
       - "^chore:"
 
-# Publishes a formula to github.com/allen-hsu/homebrew-tap so users can:
-#   brew install allen-hsu/tap/hush
-# Requires a PAT with repo scope in the HOMEBREW_TAP_GITHUB_TOKEN secret, and an
-# existing (can be empty) homebrew-tap repository.
-brews:
-  - name: hush
-    repository:
-      owner: allen-hsu
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/allen-hsu/hush"
-    description: "Local, agent-safe per-worktree secrets"
-    license: MIT
-    install: |
-      bin.install "hush"
-    test: |
-      system "#{bin}/hush", "version"
+# Homebrew tap — DISABLED until the tap repo + token exist. To enable:
+#   1. create a public repo  allen-hsu/homebrew-tap  (may be empty)
+#   2. add a repo-scoped PAT as the HOMEBREW_TAP_GITHUB_TOKEN secret on this repo
+#   3. uncomment the block below and re-tag
+# Then users can:  brew install allen-hsu/tap/hush
+#
+# brews:
+#   - name: hush
+#     repository:
+#       owner: allen-hsu
+#       name: homebrew-tap
+#       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+#     homepage: "https://github.com/allen-hsu/hush"
+#     description: "Local, agent-safe per-worktree secrets"
+#     license: MIT
+#     install: |
+#       bin.install "hush"
+#     test: |
+#       system "#{bin}/hush", "version"
 
 release:
   github:
