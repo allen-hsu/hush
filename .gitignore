@@ -1,0 +1,11 @@
+# build output
+/hush
+/dist/
+
+# local env that hush is meant to replace — never commit plaintext
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store

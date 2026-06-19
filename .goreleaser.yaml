@@ -1,0 +1,64 @@
+# GoReleaser config — https://goreleaser.com
+# Release with:  git tag v0.1.0 && git push --tags   (CI runs goreleaser)
+# Local dry run:  goreleaser release --snapshot --clean
+version: 2
+
+project_name: hush
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: hush
+    main: .
+    binary: hush
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin # macOS only: hush depends on the Keychain + hdiutil RAM disk
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+# Publishes a formula to github.com/allen-hsu/homebrew-tap so users can:
+#   brew install allen-hsu/tap/hush
+# Requires a PAT with repo scope in the HOMEBREW_TAP_GITHUB_TOKEN secret, and an
+# existing (can be empty) homebrew-tap repository.
+brews:
+  - name: hush
+    repository:
+      owner: allen-hsu
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/allen-hsu/hush"
+    description: "Local, agent-safe per-worktree secrets"
+    license: MIT
+    install: |
+      bin.install "hush"
+    test: |
+      system "#{bin}/hush", "version"
+
+release:
+  github:
+    owner: allen-hsu
+    name: hush
