@@ -1,8 +1,11 @@
-# hush — spec (draft for sign-off)
+# hush — design
 
 A local, zero-service CLI for per-worktree secrets that is **smooth for humans,
-strict for agents**. Secrets live encrypted outside the repo; the worktree only
-holds references. Plaintext exists only inside the child process of `hush run`.
+strict for agents**. Secrets live encrypted outside the repo; the worktree only holds a
+value-free declaration. Plaintext exists only inside the child process of `hush run`.
+
+This document explains *why* hush is shaped the way it is. For usage, see the
+[README](../README.md).
 
 ---
 
@@ -10,60 +13,63 @@ holds references. Plaintext exists only inside the child process of `hush run`.
 
 **Goals**
 - `cat .env` / `grep -r KEY` in a worktree yields **key names only, never values**.
-- New worktree is usable immediately (reference file is committed; values inherited).
+- A fresh worktree is usable immediately (the declaration is committed; values inherited).
 - Fork a worktree's private env in ~2 commands.
-- Human terminal feels direnv-smooth; agent context is auto-detected and locked to broker mode.
+- A human terminal feels direnv-smooth; agent context is auto-detected and locked to a
+  "use, don't see" broker mode.
 
-**Non-goals (v1)**
-- No team sharing / multi-recipient (single-user, macOS only).
-- No audit log, rotation, dynamic/short-lived creds.
-- Not a defense against a *same-user malicious agent that actively calls `hush`*.
-  See Threat boundary.
+**Non-goals** (deliberate, for a local single-user tool)
+- No team sharing / multi-recipient encryption (single-user).
+- No audit log, rotation, or dynamic/short-lived credentials.
+- macOS only.
+- Not a defense against a *same-user process that deliberately calls `hush`* — see
+  [Security model](#security-model--threat-boundary).
 
 ---
 
 ## Files & formats
 
-> **`.hush.toml` never contains values.** It is a declaration (which keys, how to
-> pick a profile, project identity). All values live encrypted in `store.age` and are
-> changed only with `hush set` — never by hand-editing a file.
+> **`.hush.toml` never contains values.** It is a declaration (which keys, how to pick a
+> profile, project identity). All values live encrypted in `store.age` and change only
+> through `hush set` / `hush edit` / `hush import` — never by hand-editing a file.
 
 **In repo (committed, no secrets):** `.hush.toml`
 ```toml
-project = "bridge-deposit"   # namespace in store.age; omit → derived from repo path
+project = "my-app"           # namespace in store.age; omit → derived from repo dir name
 profile = "branch"           # branch | cwd | fixed:<name>  — how to pick a profile
 extends = "base"             # fallback chain when a key is absent in the active profile
-keys = ["DATABASE_URL", "DEPLOYER_KEY", "STRIPE_KEY"]   # declared contract
-shims = ["forge", "cast"]    # commands to auto-wrap with `hush run` (opt-in; empty = off)
+keys = ["DATABASE_URL", "STRIPE_KEY"]   # declared contract
+shims = ["npm", "pnpm"]      # commands to auto-wrap with `hush run` (opt-in; empty = off)
 ```
 
 **Central store (outside repo):** `~/.config/hush/store.age`
-- One global encrypted file. Cleartext is namespaced **project → profile → key**, so
-  different projects on the same branch name never collide:
+- One global age-encrypted file. Cleartext is namespaced **project → profile → key**, so
+  two projects on the same branch name never collide:
   ```jsonc
   {
-    "bridge-deposit": {
-      "base":      { "DATABASE_URL": "...", "DEPLOYER_KEY": "..." },
+    "my-app": {
+      "base":      { "DATABASE_URL": "...", "STRIPE_KEY": "..." },
       "feature-x": { "DATABASE_URL": "..." }          // overrides; rest inherited from base
     },
-    "another-project": { "main": { "STRIPE_KEY": "..." } }
+    "another-project": { "main": { "API_TOKEN": "..." } }
   }
   ```
-- Master key in **macOS Keychain** (`security`), item `hush-master`. No plaintext key file on disk.
-- Single store + single key → one key to manage; values stay isolated per project.
+- Master key is an age identity in the **macOS Keychain** (`security`), generated on first
+  use. There is no plaintext key file on disk.
+- One store + one key → a single key to manage, while values stay isolated per project.
 
 ---
 
 ## Profile resolution
 
-1. Determine the **project** namespace: `.hush.toml` `project`, else derived from repo path.
-2. Determine active profile from `.hush.toml`:
-   - `branch` → current git branch name; `cwd` → worktree dir name; `fixed:x` → `x`.
-   - Detached HEAD / not a git repo under `branch` mode → fall back to `cwd` + warn.
-3. For each declared key: look up in `store[project][profile]`, then walk the `extends`
-   chain (active → ... → base) within the same project. First hit wins. Missing
-   declared key → error naming it.
-4. Keys not declared in `.hush.toml` are ignored (the file is the contract).
+1. Determine the **project** namespace: `.hush.toml` `project`, else the repo dir name.
+2. Determine the active **profile**:
+   - `branch` → current git branch; `cwd` → worktree dir name; `fixed:x` → `x`.
+   - Detached HEAD / not a git repo under `branch` mode → fall back to `cwd` and warn.
+3. For each declared key: look up `store[project][profile]`, then walk the `extends` chain
+   (active → … → base) within the same project. First hit wins. A missing declared key is
+   an error that names it.
+4. Keys not declared in `.hush.toml` are ignored — the file is the contract.
 
 ---
 
@@ -71,44 +77,51 @@ shims = ["forge", "cast"]    # commands to auto-wrap with `hush run` (opt-in; em
 
 | Command | What it does |
 |---|---|
-| `hush run -- <cmd>` | Resolve profile, decrypt, inject into **child env only**, `exec`. The only way to *use* secrets. |
-| `hush edit [--profile p]` | Decrypt the profile into `$EDITOR`, edit like a normal `.env`, re-encrypt on save. **Primary way to change values in bulk.** TTY-only; agent mode refuses. |
-| `hush set <KEY>` | Set one value: interactive prompt (not echoed, not in history), or piped stdin (`echo v \| hush set KEY`). No command-line value form (would leak via history/`ps`). |
+| `hush run -- <cmd>` | Resolve profile, decrypt, inject into the **child env only**, `exec`. The only way to *use* secrets. |
+| `hush edit [--profile p]` | Decrypt the profile into `$EDITOR`, edit like a normal `.env`, re-encrypt on save. Bulk edit. TTY-only; agent mode refuses. |
+| `hush set <KEY>` | Set one value: interactive prompt (not echoed, not in history) or piped stdin. No command-line value form (would leak via history/`ps`). |
 | `hush unset <KEY>` | Remove a key from the active profile. |
 | `hush ls [--json]` | List declared keys + which profile resolves each. **Never prints values.** |
-| `hush get <KEY>` | Print value — **only on a TTY**; non-TTY (agent) → refuse with exit 3. |
-| `hush import [path] [--profile p] [--shred]` | Read an existing `.env` (default `./.env`), write all `KEY=value` pairs into the target profile, add the keys to `.hush.toml`. `--shred` deletes the plaintext `.env` after. One-command migration. |
-| `hush fork [--from base]` | Copy `--from` profile into the active (branch) profile, so you only `set` the diffs. (Sugar for `cp` into the active profile.) |
-| `hush cp <from> <to>` | Copy one profile's values into another (generalized `fork`). Merge; `--force` to overwrite. |
-| `hush shell` | Drop into a subshell with env loaded (explicit, ephemeral; human convenience). |
-| `hush scrub` | Unset hush-managed vars from the current shell (run before launching an agent). |
+| `hush get <KEY> [--json]` | Print a value — **only on a TTY**; non-TTY (agent) → refuse with exit 3. |
+| `hush import [path] [--profile p] [--force] [--shred]` | Import an existing `.env` into a profile and record the keys. One-command migration. |
+| `hush fork [--from base]` | Copy a profile into the active one, so you only `set` the diffs. Sugar for `cp`. |
+| `hush cp <from> <to> [--force]` | Copy one profile's values into another. |
+| `hush init` | Scaffold a commented, value-free `.hush.toml`. |
+| `hush install` | Idempotently add `eval "$(hush hook)"` to `~/.zshrc`. |
+| `hush hook` | Print the shell integration snippet (shims + chpwd banner). |
+| `hush context` | Fast, keychain-free feed for the shell hook (project/profile + shim list). |
+| `hush scrub` | Print shell commands to clear hush vars/shims before launching an agent. |
+| `hush version` | Print the version. |
+
+`--json` is accepted by `ls`, `get`, `set`, `unset`, `import`, `fork`, `cp`.
 
 ---
 
-## Migration: `hush import` (adoption-critical)
+## Migration: `hush import`
 
-Goal: turn an existing plaintext `.env` into managed secrets in **one command**, so
-trying hush costs nothing.
+Turning an existing plaintext `.env` into managed secrets in **one command** is what makes
+trying hush free.
 
 ```bash
 hush import                 # reads ./.env → active profile, appends keys to .hush.toml
 hush import .env.local --profile base --shred
 ```
 
-Behavior:
-- Parse `KEY=value` (dotenv rules: `export ` prefix, quotes, `#` comments, blank lines).
-- Write each pair into the target profile in `store.age`; merge, don't clobber unless `--force`.
-- Add any new keys to `.hush.toml` `keys = [...]` (the file stays value-free).
-- Report a summary: `imported 7 keys → profile base (2 new, 5 updated)`.
-- `--shred`: securely remove the plaintext `.env` afterward; otherwise leave it and
-  print a reminder to delete + gitignore. Round-trip check (decrypt == source) before shred.
+- Parses `KEY=value` with dotenv rules (`export ` prefix, quotes, `#` comments, blanks).
+- Writes each pair into the target profile; merges, doesn't clobber unless `--force`.
+- Adds new keys to `.hush.toml` `keys = [...]` (the file stays value-free; **comments and
+  formatting are preserved** — only the `keys` array is rewritten).
+- `--shred` securely removes the source `.env` after a round-trip check (decrypt ==
+  source); otherwise it leaves the file and prints a reminder to delete + gitignore it.
 
-## Consuming secrets (how a program reads them)
+---
 
-**No code changes, no SDK, no library.** hush works at the OS process layer: it
-decrypts, populates the child process's environment, then `exec`s the command. The
-program reads env vars the standard way — hush is the thing that *sets* the environment,
-not something the code talks to.
+## Consuming secrets
+
+**No code changes, no SDK, no library.** hush works at the OS process layer: it decrypts,
+populates the child process's environment, then `exec`s the command. Your program reads
+env vars the standard way — hush is the thing that *sets* the environment, not something
+the code talks to.
 
 ```js
 const url = process.env.DATABASE_URL;        // JS — unchanged
@@ -116,38 +129,40 @@ const url = process.env.DATABASE_URL;        // JS — unchanged
 ```python
 url = os.environ["DATABASE_URL"]             # Python — unchanged
 ```
-```solidity
-string memory pk = vm.envString("DEPLOYER_KEY");  // foundry — unchanged
+```go
+url := os.Getenv("DATABASE_URL")             // Go — unchanged
 ```
 
 Only the launch changes:
 ```bash
-node app.js                  →  hush run -- node app.js
-forge script ...             →  hush run -- forge script ...
+node app.js          →  hush run -- node app.js
+npm run dev          →  hush run -- npm run dev
 # with shims installed, you type the bare command and the shim wraps it.
 ```
 
-- **dotenv libraries**: drop `dotenv.config()` (env is already injected); leaving it in
-  is harmless (no `.env` → no-op), so migration can be gradual.
-- **Auto-loading frameworks** (Next.js / Vite / foundry): they merge their own `.env`
-  files with `process.env`, and injected `process.env` wins — so `hush run -- next dev`
+- **dotenv libraries**: drop `dotenv.config()` (env is already injected); leaving it in is
+  harmless (no `.env` → no-op), so migration can be gradual.
+- **Auto-loading frameworks** (Next.js / Vite / etc.): they merge their own `.env` files
+  with `process.env`, and the injected `process.env` wins — so `hush run -- next dev`
   works with no `.env` file in the worktree at all.
 
 ### Universality & exceptions
 
 Works for **anything that reads environment variables — every language, framework, and
-CLI** (`node`, `python`, `go`, `forge`, `psql`, `aws`, `docker`, `terraform`, Makefiles,
-shell scripts…), because that's an OS-level mechanism below any language.
+CLI** (`node`, `python`, `go`, `psql`, `aws`, `docker`, `terraform`, Makefiles, shell
+scripts…), because that is an OS-level mechanism below any language.
 
 Out of scope (not "broken", just not what env injection covers):
 - **Tools that only read a config file**, not env (e.g. `~/.pgpass`). Bridge with
   `hush run -- sh -c 'tool --pass=$DB_PASSWORD'`.
-- **Daemons started by systemd/launchd**, not launched manually — make the service
-  manager invoke through hush.
+- **Daemons started by systemd/launchd**, not launched manually — make the service manager
+  invoke through hush.
 - **Mid-run rotation / short-lived creds** — hush injects a startup snapshot; dynamic
-  rotation is Vault territory, not v1.
-- **CI / other machines** — Keychain is local; CI keeps its own secret mechanism. hush
+  rotation is a secrets-manager (e.g. Vault) concern.
+- **CI / other machines** — the Keychain is local; CI keeps its own secret mechanism. hush
   targets local development.
+
+---
 
 ## Editing values: `hush edit`
 
@@ -158,78 +173,88 @@ hush edit                 # active profile → $EDITOR → re-encrypt on save
 hush edit --profile base
 ```
 
-- Decrypt active profile to a temp file, open `$EDITOR`, re-encrypt to `store.age` on
+- Decrypt the active profile to a temp file, open `$EDITOR`, re-encrypt to `store.age` on
   save, then destroy the temp.
-- **Temp file is RAM-backed (implemented):** on macOS the temp lives on an on-demand
-  `hdiutil` RAM disk (`/Volumes/hush-edit-*`), so plaintext never touches persistent
-  storage — secure-delete is unreliable on APFS/SSD (copy-on-write), so not-writing-it
-  is the only sound guarantee. The whole volume is detached on exit. If a RAM disk can't
-  be created, it falls back to a `0700` TMPDIR dir and **warns** that plaintext briefly
-  touches disk.
+- **The temp file is RAM-backed.** On macOS it lives on an on-demand `hdiutil` RAM disk
+  (`/Volumes/hush-edit-*`), so plaintext never touches persistent storage — secure-delete
+  is unreliable on APFS/SSD (copy-on-write), so *not writing it* is the only sound
+  guarantee. The whole volume is detached on exit. If a RAM disk can't be created, it falls
+  back to a `0700` TMPDIR dir and warns that plaintext briefly touches disk.
 - Needs a TTY + editor → **agent mode refuses** (agents use, don't edit).
+
+---
 
 ## Dual-mode behavior (the core idea)
 
 Mode is auto-detected, not configured:
 
 ```
-agent / non-interactive  →  STRICT (broker): auto-load disabled; only `hush run` works;
-                            `hush get` refused. Detected by: CLAUDECODE set, or no TTY.
-interactive human shell  →  SMOOTH: shell shim + chpwd hook active.
+agent / non-interactive  →  STRICT: no shims; only `hush run` works; `hush get` refused.
+                            Detected by: CLAUDECODE/HUSH_AGENT set, or no TTY.
+interactive human shell  →  SMOOTH: shell shims + chpwd banner active.
 ```
 
-**Smoothness (human only):**
-- **Command shims**: commands listed in `.hush.toml` `shims` (per-project opt-in, empty
-  by default) auto-wrap to `hush run -- <cmd>`. Values land in that child only — the
-  persistent shell stays clean.
-- **chpwd hook**: on `cd` into a worktree, switch the *active profile* and print a
-  one-line banner (`hush: profile feature-x · 3 keys`). It **does not export values**.
+**Smoothness (human only),** via `eval "$(hush hook)"`:
+- **Command shims**: commands listed in `.hush.toml` `shims` (per-project opt-in, empty by
+  default) auto-wrap to `hush run -- <cmd>`. Values land in that child only — the
+  persistent shell stays clean. No recursion: `hush run` execs the real binary via PATH,
+  which `execve` resolves without consulting shell functions.
+- **chpwd banner**: on `cd` into a project, a one-line banner shows the active
+  `project · profile`. It re-applies only when the resolved context actually changes
+  (quiet across subdirs) and **never exports values**.
 
-Because values never enter the persistent shell, launching an agent from that shell
-cannot leak them by inheritance. (`hush scrub` exists only for the `hush shell` path.)
+Because values never enter the persistent shell, launching an agent from that shell cannot
+leak them by inheritance. `hush scrub` additionally clears any hush-managed vars/shims on
+demand before you spawn an agent.
 
 ---
 
 ## Agent-friendliness contract
 
 - `hush run` = "use, don't see." It is the agent's only entry point.
-- `hush ls` lists names; `hush get` refuses without a TTY; values never hit stdout in agent mode.
-- Non-TTY never prompts (won't hang an agent); stable exit codes; `--json` everywhere.
-- Errors state the human next step, e.g. `KEY DEPLOYER_KEY unset — run: hush set DEPLOYER_KEY`.
-- Pairs with a harness hook denying `Read(.env*)` and `cat/grep .env` for defense in depth.
+- `hush ls` lists names; `hush get` refuses without a TTY; values never reach stdout in
+  agent mode.
+- Non-TTY never prompts (won't hang an agent); stable exit codes; `--json` on read/write
+  commands.
+- Errors state the human next step, e.g.
+  `unset keys for profile "main": DEPLOYER_KEY — run: hush set <KEY>`.
+- Pairs well with a harness rule denying `Read(.env*)` and `cat/grep .env` for defense in
+  depth.
 
 ---
 
 ## Security model & threat boundary
 
-**Stops:** `cat`/`grep` of worktree files surfacing secrets; accidental commit of values;
-secrets leaking into the persistent shell (and thereby into a launched agent).
+**Stops** the realistic, common failure modes:
+- `cat` / `grep` of worktree files surfacing secret values;
+- accidental commit of values (the repo only ever holds key *names*);
+- secrets leaking into the persistent shell (and thereby into a launched agent);
+- `edit` writing plaintext to persistent storage (RAM-disk backed; see above).
 
-**Does NOT stop:** a same-user process that *deliberately calls `hush run -- env`* — any
-local tool that can decrypt, an attacker sharing the uid can invoke too. Closing that
-needs a separate trust domain (daemon / Keychain ACL per-binary) — explicitly out of v1.
+**Does NOT stop** a same-user process that *deliberately* runs `hush run -- env`. Any local
+tool that can decrypt can be invoked by anything sharing your uid; closing that needs a
+separate trust domain (daemon / per-binary Keychain ACL), which is out of scope. The goal
+is to defeat accidental exposure and an agent's reflex to read files — not a determined
+local attacker.
 
-Exit codes: `0` ok · `2` config/usage · `3` refused (e.g. `get` without TTY) · `4` decrypt/Keychain failure.
+**Exit codes:** `0` ok · `2` config/usage · `3` refused (e.g. `get` without a TTY) ·
+`4` decrypt/Keychain/runtime failure.
 
 ---
 
-## MVP scope (v1)
+## Design decisions & rationale
 
-`run` · `edit` · `set` · `unset` · `ls` · `import` · `fork` + command shims + chpwd profile switch + CLAUDECODE/TTY detection.
-Defer: `shell`, `scrub`, `--json` on every command, multi-recipient, rotation.
-
----
-
-## Decisions (signed off)
-
-1. **Language: Go** — single static binary, easy to distribute; `age` has an official Go
-   library (`filippo.io/age`) so encryption needs no external dependency.
-2. **Shims: per-project opt-in, empty by default.** No global hardcoded list (wrapping
-   e.g. `node` everywhere would pay decrypt cost and inject secrets where unneeded).
-   Each project declares `shims = [...]` in `.hush.toml`; absent → behavior unchanged.
-3. **Detached HEAD / no git: fall back to `cwd`, print a warning, don't error.** If that
-   profile is also missing, walk the `extends` chain to base. Rationale: a detached
-   checkout shouldn't block `hush run`; cwd is predictable and the warning flags that
+1. **Language: Go.** Single static binary, easy to distribute; `age` has an official Go
+   library (`filippo.io/age`), so encryption needs no external dependency.
+2. **Shims are per-project opt-in, empty by default.** No global hardcoded list — wrapping
+   e.g. `node` everywhere would pay decryption cost and inject secrets where unneeded. Each
+   project declares `shims = [...]`; absent → behavior unchanged.
+3. **Detached HEAD / no git falls back to `cwd` with a warning, never errors.** A detached
+   checkout shouldn't block `hush run`; `cwd` is predictable and the warning flags that
    you're off the branch profile (safer than silently using base).
-4. **One global `store.age`, namespaced internally project → profile → key** — one key to
-   manage, values isolated per project.
+4. **One global `store.age`, namespaced project → profile → key.** One key to manage, with
+   values isolated per project — rather than a per-repo key file that would scatter keys.
+5. **The master key lives in the Keychain, not a key file.** age-encrypted `.env`
+   alternatives still leave a plaintext private-key file on disk; the Keychain avoids that.
+6. **Values inject into the child only, never the shell.** This is the dividing line from
+   direnv-style tools, and what makes the dual-mode agent guarantee possible.
