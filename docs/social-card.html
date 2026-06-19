@@ -1,0 +1,106 @@
+<!doctype html>
+<!-- Social preview card. Render to docs/social-card.png at 1280x640. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1280px; height: 640px; }
+      body {
+        font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+        background:
+          radial-gradient(1100px 600px at 88% -8%, rgba(139, 122, 255, 0.22), transparent 60%),
+          radial-gradient(900px 500px at -6% 110%, rgba(80, 250, 200, 0.14), transparent 55%),
+          #0c0f17;
+        color: #e6e8ee;
+        padding: 76px 80px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        overflow: hidden;
+      }
+      .top { display: flex; align-items: baseline; gap: 22px; }
+      .logo {
+        font-family: "SF Mono", "JetBrains Mono", Menlo, monospace;
+        font-size: 116px;
+        font-weight: 700;
+        letter-spacing: -3px;
+        background: linear-gradient(92deg, #c4b5ff, #8b7aff 45%, #5ce0c0);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .cursor {
+        display: inline-block;
+        width: 40px; height: 92px;
+        background: #5ce0c0;
+        border-radius: 4px;
+        transform: translateY(8px);
+        box-shadow: 0 0 26px rgba(92, 224, 192, 0.6);
+      }
+      .tag {
+        font-size: 40px;
+        font-weight: 600;
+        line-height: 1.25;
+        max-width: 1010px;
+        margin-top: 10px;
+        color: #f2f3f7;
+      }
+      .tag .accent { color: #8b7aff; }
+      .term {
+        font-family: "SF Mono", "JetBrains Mono", Menlo, monospace;
+        font-size: 30px;
+        color: #b8c0d0;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 20px 26px;
+        width: fit-content;
+      }
+      .term .p { color: #5ce0c0; }
+      .term .c { color: #6b7488; }
+      .bullets { display: flex; gap: 40px; font-size: 25px; color: #cdd2dd; }
+      .bullets b { color: #fff; font-weight: 600; }
+      .foot {
+        display: flex; justify-content: space-between; align-items: center;
+        font-family: "SF Mono", "JetBrains Mono", Menlo, monospace;
+        font-size: 27px; color: #9aa3b5;
+      }
+      .foot .repo { color: #c4b5ff; }
+      .pills { display: flex; gap: 14px; }
+      .pill {
+        font-size: 20px; color: #aeb6c6;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 999px; padding: 7px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <div class="top">
+        <div class="logo">hush</div>
+        <div class="cursor"></div>
+      </div>
+      <div class="tag">
+        Local, <span class="accent">agent-safe</span> per-worktree secrets —
+        keep <code>.env</code> values out of your repo and out of AI agents' reach.
+      </div>
+    </div>
+
+    <div class="term">
+      <span class="p">$</span> hush run -- npm run dev
+      <span class="c"># injects env into THIS child only, never your shell</span>
+    </div>
+
+    <div class="bullets">
+      <div>🔐 <b>age-encrypted</b>, key in Keychain</div>
+      <div>🔍 <b>grep-proof</b> worktree</div>
+      <div>🤖 <b>strict for agents</b>, smooth for you</div>
+    </div>
+
+    <div class="foot">
+      <span class="repo">github.com/allen-hsu/hush</span>
+      <span class="pills"><span class="pill">macOS</span><span class="pill">Go</span><span class="pill">MIT</span></span>
+    </div>
+  </body>
+</html>
