@@ -103,7 +103,8 @@ commit 進去的 `.hush.toml` 會跟著 checkout 走，所以新 worktree 馬上
 | `hush run -- <cmd>` | 解析 profile、把 env 注入子行程、exec。**能用、不能看。** |
 | `hush edit` | 在 `$EDITOR` 裡編輯一個 profile（限 TTY；agent 被拒；RAM-disk 支撐）。 |
 | `hush set <KEY>` | 設定單一值——互動輸入或 piped stdin。 |
-| `hush unset <KEY>` | 從當前 profile 移除一個 key。 |
+| `hush unset <KEY>` | 從當前 profile 移除某個 key 的值（保留宣告）。 |
+| `hush purge <KEY>` | 從**所有** profile + `.hush.toml` 移除一個 key（破壞性；非互動需 `--yes`）。 |
 | `hush ls` | 列出宣告的 key + 由哪個 profile 解析。永不顯示值。 |
 | `hush get [KEY]` | 印出某個值（限 TTY；對 agent 拒絕）。省略 `KEY` 會列出編號清單讓你選；設 `disable_get = true` 可完全禁用。 |
 | `hush import [path]` | 匯入現有 `.env`。旗標：`--profile`、`--force`、`--shred`。 |

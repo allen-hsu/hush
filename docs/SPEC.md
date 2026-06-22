@@ -80,7 +80,8 @@ shims = ["npm", "pnpm"]      # commands to auto-wrap with `hush run` (opt-in; em
 | `hush run -- <cmd>` | Resolve profile, decrypt, inject into the **child env only**, `exec`. The only way to *use* secrets. |
 | `hush edit [--profile p]` | Decrypt the profile into `$EDITOR`, edit like a normal `.env`, re-encrypt on save. Bulk edit. TTY-only; agent mode refuses. |
 | `hush set <KEY>` | Set one value: interactive prompt (not echoed, not in history) or piped stdin. No command-line value form (would leak via history/`ps`). |
-| `hush unset <KEY>` | Remove a key from the active profile. |
+| `hush unset <KEY>` | Remove a key's value from the active profile (key stays declared). |
+| `hush purge <KEY> [--yes]` | Remove a key from every profile + `.hush.toml`. Destructive: needs a TTY confirmation or `--yes`; refused for agents without `--yes`. |
 | `hush ls [--json]` | List declared keys + which profile resolves each. **Never prints values.** |
 | `hush get [KEY] [--json]` | Print a value — **TTY only**; omit `KEY` to pick from a numbered list; non-TTY/agent → refuse (exit 3); always refused when `disable_get = true`. |
 | `hush import [path] [--profile p] [--force] [--shred]` | Import an existing `.env` into a profile and record the keys. One-command migration. |

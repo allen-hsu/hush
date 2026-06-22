@@ -111,7 +111,8 @@ once; you only `set` the diffs.
 | `hush run -- <cmd>` | Resolve profile, inject env into the child, exec. **Use, don't see.** |
 | `hush edit` | Edit a profile in `$EDITOR` (TTY only; agents refused; RAM-disk backed). |
 | `hush set <KEY>` | Set one value — interactive prompt or piped stdin. |
-| `hush unset <KEY>` | Remove a key from the active profile. |
+| `hush unset <KEY>` | Remove a key's value from the active profile (leaves it declared). |
+| `hush purge <KEY>` | Remove a key from **every** profile + `.hush.toml` (destructive; needs `--yes` non-interactively). |
 | `hush ls` | List declared keys + which profile resolves each. Never prints values. |
 | `hush get [KEY]` | Print a value (TTY only; refused for agents). Omit `KEY` to pick from a numbered list; set `disable_get = true` to forbid it entirely. |
 | `hush import [path]` | Import an existing `.env`. Flags: `--profile`, `--force`, `--shred`. |

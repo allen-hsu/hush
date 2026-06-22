@@ -238,6 +238,84 @@ func cmdUnset(args []string) error {
 	return nil
 }
 
+// cmdPurge removes a key from EVERY profile in the project and drops it from
+// .hush.toml — the "this key is gone from the project" action, vs unset which
+// only clears the active profile's value. Destructive: needs --yes or a y/N
+// confirmation on a TTY; refused for agents/non-interactive without --yes.
+func cmdPurge(args []string) error {
+	asJSON, args := popJSON(args)
+	yes := false
+	var rest []string
+	for _, a := range args {
+		if a == "--yes" || a == "-y" {
+			yes = true
+		} else {
+			rest = append(rest, a)
+		}
+	}
+	if len(rest) != 1 {
+		return usageErr("purge: exactly one KEY required")
+	}
+	key := rest[0]
+
+	cfg, st, ctx, data, err := load()
+	if err != nil {
+		return err
+	}
+
+	// Count profiles that currently hold the key.
+	n := 0
+	for _, kv := range data[ctx.Project] {
+		if _, ok := kv[key]; ok {
+			n++
+		}
+	}
+	declared := contains(cfg.Keys, key)
+
+	if !yes {
+		if isAgent() {
+			return refusedErr("purge needs confirmation — pass --yes (refused for agents/non-interactive)")
+		}
+		fmt.Fprintf(os.Stderr, "purge %q from project %s: %d profile value(s)%s? [y/N]: ",
+			key, ctx.Project, n, map[bool]string{true: " + .hush.toml", false: ""}[declared])
+		var ans string
+		_, _ = fmt.Fscan(os.Stdin, &ans)
+		if ans != "y" && ans != "Y" && ans != "yes" {
+			return coded{exitUsage, "aborted"}
+		}
+	}
+
+	// Remove the value from every profile, and the name from the declaration.
+	for _, kv := range data[ctx.Project] {
+		delete(kv, key)
+	}
+	if declared {
+		newKeys := make([]string, 0, len(cfg.Keys))
+		for _, k := range cfg.Keys {
+			if k != key {
+				newKeys = append(newKeys, k)
+			}
+		}
+		cfg.Keys = newKeys
+		if err := writeConfig(cfg); err != nil {
+			return err
+		}
+	}
+	if err := st.Save(data); err != nil {
+		return err
+	}
+
+	if asJSON {
+		return emitJSON(map[string]any{
+			"ok": true, "action": "purge", "key": key,
+			"project": ctx.Project, "profiles_cleared": n, "undeclared": declared,
+		})
+	}
+	fmt.Fprintf(os.Stderr, "purged %s from project %s (%d profile value(s)%s)\n",
+		key, ctx.Project, n, map[bool]string{true: ", removed from .hush.toml", false: ""}[declared])
+	return nil
+}
+
 // cmdImport reads an existing .env into a profile and records the keys.
 func cmdImport(args []string) error {
 	asJSON, args := popJSON(args)

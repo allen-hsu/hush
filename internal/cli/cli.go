@@ -30,7 +30,8 @@ usage:
   hush run -- <cmd> [args...]   resolve profile, inject env, exec (use, don't see)
   hush edit [--profile p]       edit a profile in $EDITOR (TTY only)
   hush set <KEY>                set one value (interactive prompt or piped stdin)
-  hush unset <KEY>              remove a key from the active profile
+  hush unset <KEY>              remove a key's value from the active profile
+  hush purge <KEY> [--yes]      remove a key from ALL profiles + .hush.toml (destructive)
   hush ls [--json]              list declared keys + resolving profile (no values)
   hush get [KEY]                print a value (TTY only; omit KEY to pick from a list)
   hush import [path] [flags]    import an existing .env into a profile
@@ -62,6 +63,8 @@ func Run(args []string) int {
 		err = cmdSet(rest)
 	case "unset":
 		err = cmdUnset(rest)
+	case "purge":
+		err = cmdPurge(rest)
 	case "ls":
 		err = cmdLs(rest)
 	case "get":
